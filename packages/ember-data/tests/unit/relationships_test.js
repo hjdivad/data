@@ -454,23 +454,27 @@ test("relationships work when the data hash has not been loaded", function() {
             equal(get(person, 'tag') instanceof Tag, true, "the tag Model already exists");
             equal(get(person, 'tag.isLoaded'), false, "the tag objects exist, but are not yet loaded");
           }, 1);
-        } else if (type === Tag) {
-          equal(type, Tag, "type should be Tag");
-          equal(id, 2, "id should be 2");
-
-          stop();
-
-          setTimeout(function() {
-            start();
-            store.load(type, 2, { id: 2, name: "friendly" });
-
-            equal(get(person, 'name'), "Tom Dale", "precond - the person is still Tom Dale");
-            equal(get(person, 'tag.name'), "friendly", "Tom Dale is now friendly");
-            equal(get(person, 'tag.isLoaded'), true, "Tom Dale is now loaded");
-          }, 1);
         }
       }
-    })
+    }),
+
+    recordForReference: function(reference) {
+      equal(reference.type, Tag, "type should be Tag");
+      equal(reference.id, 2, "id should be 2");
+
+      stop();
+
+      setTimeout(function() {
+        start();
+        store.load(reference.type, 2, { id: 2, name: "friendly" });
+
+        equal(get(person, 'name'), "Tom Dale", "precond - the person is still Tom Dale");
+        equal(get(person, 'tag.name'), "friendly", "Tom Dale is now friendly");
+        equal(get(person, 'tag.isLoaded'), true, "Tom Dale is now loaded");
+      }, 1);
+
+      return this.findByClientId(reference.type, reference.clientId);
+    }
   });
 
   var person = store.find(Person, 1);

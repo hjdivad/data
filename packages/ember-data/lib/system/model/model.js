@@ -193,8 +193,15 @@ DS.Model = Ember.Object.extend(Ember.Evented, LoadPromise, {
       var ids = this._data.hasMany[key] || [];
 
       var references = map(ids, function(id) {
-        // if it was already a reference, return the reference
-        if (typeof id === 'object') { return id; }
+        if (typeof id === 'object') {
+          if( id.clientId ) {
+            // if it was already a reference, return the reference
+            return id;
+          } else {
+            // <id, type> tuple for a polymorphic association.
+            return store.referenceForId(id.type, id.id);
+          }
+        }
         return store.referenceForId(type, id);
       });
 
@@ -228,12 +235,41 @@ DS.Model = Ember.Object.extend(Ember.Evented, LoadPromise, {
     this._data.attributes[name] = value;
   },
 
-  materializeHasMany: function(name, ids) {
-    this._data.hasMany[name] = ids;
+  materializeHasMany: function(name, tuplesOrReferences) {
+    if (tuplesOrReferences && tuplesOrReferences.length > 1) { Ember.assert('materializeHasMany expects tuples or references, not ' + tuplesOrReferences[0], tuplesOrReferences[0].hasOwnProperty('id') && tuplesOrReferences[0].type); }
+    var references = tuplesOrReferences;
+
+    if (tuplesOrReferences && Ember.isArray(tuplesOrReferences)) {
+      references = this._convertTuplesToReferences(tuplesOrReferences);
+    }
+
+    this._data.hasMany[name] = references;
   },
 
-  materializeBelongsTo: function(name, id) {
-    this._data.belongsTo[name] = id;
+  materializeBelongsTo: function(name, tupleOrReference) {
+    if (tupleOrReference) { Ember.assert('materializeBelongsTo expects a tuple or a reference, not a ' + tupleOrReference, !tupleOrReference || (tupleOrReference.hasOwnProperty('id') && tupleOrReference.hasOwnProperty('type'))); }
+    var reference = tupleOrReference;
+
+    if (tupleOrReference) {
+      reference = this._convertTupleToReference(tupleOrReference);
+    }
+
+    this._data.belongsTo[name] = reference;
+  },
+
+  _convertTuplesToReferences: function(tuplesOrReferences) {
+    return map(tuplesOrReferences, function(tupleOrReference) {
+      return this._convertTupleToReference(tupleOrReference);
+    }, this);
+  },
+
+  _convertTupleToReference: function(tupleOrReference) {
+    var store = get(this, 'store');
+    if(tupleOrReference.clientId) {
+      return tupleOrReference;
+    } else {
+      return store.referenceForId(tupleOrReference.type, tupleOrReference.id);
+    }
   },
 
   rollback: function() {

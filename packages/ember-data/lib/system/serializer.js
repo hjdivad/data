@@ -194,6 +194,7 @@ function mustImplement(name) {
 DS.Serializer = Ember.Object.extend({
   init: function() {
     this.mappings = Ember.Map.create();
+    this.aliases = Ember.Map.create();
     this.configurations = Ember.Map.create();
     this.globalConfigurations = {};
   },
@@ -202,8 +203,7 @@ DS.Serializer = Ember.Object.extend({
   extractMany: mustImplement('extractMany'),
 
   extractRecordRepresentation: function(loader, type, json, shouldSideload) {
-    var mapping = this.mappingForType(type);
-    var embeddedData, prematerialized = {}, reference;
+    var prematerialized = {}, reference;
 
     if (shouldSideload) {
       reference = loader.sideload(type, json);
@@ -234,7 +234,8 @@ DS.Serializer = Ember.Object.extend({
     var references = map.call(array, function(item) {
       if (!item) { return; }
 
-      var reference = this.extractRecordRepresentation(loader, relationship.type, item, true);
+      var foundType = this.extractEmbeddedType(relationship, item),
+          reference = this.extractRecordRepresentation(loader, foundType, item, true);
 
       // If the embedded record should also be saved back when serializing the parent,
       // make sure we set its parent since it will not have an ID.
@@ -250,7 +251,8 @@ DS.Serializer = Ember.Object.extend({
   },
 
   extractEmbeddedBelongsTo: function(loader, relationship, data, parent, prematerialized) {
-    var reference = this.extractRecordRepresentation(loader, relationship.type, data, true);
+    var foundType = this.extractEmbeddedType(relationship, data),
+        reference = this.extractRecordRepresentation(loader, foundType, data, true);
     prematerialized[relationship.key] = reference;
 
     // If the embedded record should also be saved back when serializing the parent,
@@ -259,6 +261,24 @@ DS.Serializer = Ember.Object.extend({
     if (embeddedType === 'always') {
       reference.parent = parent;
     }
+  },
+
+  /**
+    A hook you can use to customize how the record's type is extracted from
+    the serialized data.
+
+    The `extractEmbeddedType` hook is called with:
+
+    * the serialized representation being built
+    * the serialized id (after calling the `serializeId` hook)
+
+    By default, it returns the type of the relationship.
+
+    @param {Object} relationship an object representing the relationship
+    @param {any} data the serialized representation that is being built
+  */
+  extractEmbeddedType: function(relationship, data) {
+    return relationship.type;
   },
 
   //.......................
@@ -276,6 +296,7 @@ DS.Serializer = Ember.Object.extend({
 
     * If the option hash contains `includeId`, add the record's ID to the serialized form.
       By default, `serialize` calls `addId` if appropriate.
+    * If the option hash contains `includeType`, add the record's type to the serialized form.
     * Add the record's attributes to the serialized form. By default, `serialize` calls
       `addAttributes`.
     * Add the record's relationships to the serialized form. By default, `serialize` calls
@@ -294,6 +315,10 @@ DS.Serializer = Ember.Object.extend({
       if (id = get(record, 'id')) {
         this._addId(serialized, record.constructor, id);
       }
+    }
+
+    if (options.includeType) {
+      this.addType(serialized, record.constructor);
     }
 
     this.addAttributes(serialized, record);
@@ -383,6 +408,20 @@ DS.Serializer = Ember.Object.extend({
     @param {id} id the serialized id
   */
   addId: Ember.K,
+
+  /**
+    A hook you can use to customize how the record's type is added to
+    the serialized data.
+
+    The `addType` hook is called with:
+
+    * the serialized representation being built
+    * the serialized id (after calling the `serializeId` hook)
+
+    @param {any} data the serialized representation that is being built
+    @param {DS.Model subclass} type the type of the record
+  */
+  addType: Ember.K,
 
   /**
     A hook you can use to change how relationships are added to the serialized
@@ -666,13 +705,15 @@ DS.Serializer = Ember.Object.extend({
     record.eachRelationship(function(name, relationship) {
       if (relationship.kind === 'hasMany') {
         if (prematerialized && prematerialized.hasOwnProperty(name)) {
-          record.materializeHasMany(name, prematerialized[name]);
+          var tuplesOrReferences = this._convertTuples(relationship.type, prematerialized[name]);
+          record.materializeHasMany(name, tuplesOrReferences);
         } else {
           this.materializeHasMany(name, record, hash, relationship, prematerialized);
         }
       } else if (relationship.kind === 'belongsTo') {
         if (prematerialized && prematerialized.hasOwnProperty(name)) {
-          record.materializeBelongsTo(name, prematerialized[name]);
+          var tupleOrReference = this._convertTuple(relationship.type, prematerialized[name]);
+          record.materializeBelongsTo(name, tupleOrReference);
         } else {
           this.materializeBelongsTo(name, record, hash, relationship, prematerialized);
         }
@@ -681,13 +722,35 @@ DS.Serializer = Ember.Object.extend({
   },
 
   materializeHasMany: function(name, record, hash, relationship) {
-    var key = this._keyForHasMany(record.constructor, relationship.key);
-    record.materializeHasMany(name, this.extractHasMany(record.constructor, hash, key));
+    var type = record.constructor,
+        key = this._keyForHasMany(type, relationship.key),
+        idsOrTuples = this.extractHasMany(type, hash, key),
+        tuples = idsOrTuples;
+
+    if(idsOrTuples && Ember.isArray(idsOrTuples)) {
+      tuples = this._convertTuples(relationship.type, idsOrTuples);
+    }
+
+    record.materializeHasMany(name, tuples);
   },
 
   materializeBelongsTo: function(name, record, hash, relationship) {
-    var key = this._keyForBelongsTo(record.constructor, relationship.key);
-    record.materializeBelongsTo(name, this.extractBelongsTo(record.constructor, hash, key));
+    var type = record.constructor,
+        key = this._keyForBelongsTo(type, relationship.key),
+        idOrTuple,
+        tuple = null;
+
+    if(relationship.options && relationship.options.polymorphic) {
+      idOrTuple = this.extractBelongsToPolymorphic(type, hash, key);
+    } else {
+      idOrTuple = this.extractBelongsTo(type, hash, key);
+    }
+
+    if(idOrTuple) {
+      tuple = this._convertTuple(relationship.type, idOrTuple);
+    }
+
+    record.materializeBelongsTo(name, tuple);
   },
 
   _extractEmbeddedRelationship: function(type, hash, name, relationshipType) {
@@ -704,6 +767,28 @@ DS.Serializer = Ember.Object.extend({
 
   _extractEmbeddedHasMany: function(type, hash, name) {
     return this._extractEmbeddedRelationship(type, hash, name, 'HasMany');
+  },
+
+  _convertTuples: function(type, idsOrTuples) {
+    return map.call(idsOrTuples, function(idOrTuple) {
+      return this._convertTuple(type, idOrTuple);
+    }, this);
+  },
+
+  _convertTuple: function(type, idOrTuple) {
+    var foundType;
+
+    if (typeof idOrTuple === 'object') {
+      if (DS.Model.detect(idOrTuple.type)) {
+        return idOrTuple;
+      } else {
+        foundType = this.typeFromAlias(idOrTuple.type);
+        Ember.assert("Unable to resolve type " + idOrTuple.type + ".  You may need to configure your serializer aliases.", !!foundType);
+
+        return {id: idOrTuple.id, type: foundType};
+      }
+    }
+    return {id: idOrTuple, type: type};
   },
 
   /**
@@ -934,10 +1019,23 @@ DS.Serializer = Ember.Object.extend({
       return;
     }
 
-    var config = Ember.create(this.globalConfigurations);
+    var config, alias;
+
+    if (configuration.alias) {
+      alias = configuration.alias;
+      this.aliases.set(alias, type);
+      delete configuration.alias;
+    }
+
+    config = Ember.create(this.globalConfigurations);
     Ember.merge(config, configuration);
 
     this.configurations.set(type, config);
+  },
+
+  typeFromAlias: function(alias) {
+    this._completeAliases();
+    return this.aliases.get(alias);
   },
 
   mappingForType: function(type) {
@@ -948,6 +1046,59 @@ DS.Serializer = Ember.Object.extend({
   configurationForType: function(type) {
     this._reifyConfigurations();
     return this.configurations.get(type) || this.globalConfigurations;
+  },
+
+  _completeAliases: function() {
+    this._pluralizeAliases();
+    this._reifyAliases();
+  },
+
+  _pluralizeAliases: function() {
+    if (this._didPluralizeAliases) { return; }
+
+    var aliases = this.aliases,
+        sideloadMapping = this.aliases.sideloadMapping,
+        plural,
+        self = this;
+
+    aliases.forEach(function(key, type) {
+      plural = self.pluralize(key);
+      Ember.assert("The '" + key + "' alias has already been defined", !aliases.get(plural));
+      aliases.set(plural, type);
+    });
+
+    // This map is only for backward compatibility with the `sideloadAs` option.
+    if (sideloadMapping) {
+      sideloadMapping.forEach(function(key, type) {
+        Ember.assert("The '" + key + "' alias has already been defined", !aliases.get(key) || (aliases.get(key)===type) );
+        aliases.set(key, type);
+      });
+      delete this.aliases.sideloadMapping;
+    }
+
+    this._didPluralizeAliases = true;
+  },
+
+  _reifyAliases: function() {
+    if (this._didReifyAliases) { return; }
+
+    var aliases = this.aliases,
+        reifiedAliases = Ember.Map.create(),
+        foundType;
+
+    aliases.forEach(function(key, type) {
+      if (typeof type === 'string') {
+        foundType = Ember.get(Ember.lookup, type);
+        Ember.assert("Could not find model at path " + key, type);
+
+        reifiedAliases.set(key, foundType);
+      } else {
+        reifiedAliases.set(key, type);
+      }
+    });
+
+    this.aliases = reifiedAliases;
+    this._didReifyAliases = true;
   },
 
   _reifyMappings: function() {
@@ -1055,6 +1206,33 @@ DS.Serializer = Ember.Object.extend({
         }
       }
     }, this);
-  }
+  },
+
+  // HELPERS
+
+  // define a plurals hash in your subclass to define
+  // special-case pluralization
+  pluralize: function(name) {
+    var plurals = this.configurations.get('plurals');
+    return (plurals && plurals[name]) || name + "s";
+  },
+
+  // use the same plurals hash to determine
+  // special-case singularization
+  singularize: function(name) {
+    var plurals = this.configurations.get('plurals');
+    if (plurals) {
+      for (var i in plurals) {
+        if (plurals[i] === name) {
+          return i;
+        }
+      }
+    }
+    if (name.lastIndexOf('s') === name.length - 1) {
+      return name.substring(0, name.length - 1);
+    } else {
+      return name;
+    }
+  },
 });
 
