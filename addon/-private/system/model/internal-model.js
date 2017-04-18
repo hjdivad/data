@@ -550,10 +550,19 @@ export default class InternalModel {
     let changedKeys;
 
     if (this.hasRecord) {
-      changedKeys = this._changedKeys(data.attributes);
+      if (this._record._changedKeys) {
+        changedKeys = this._record._changedKeys(data.attributes);
+      } else {
+        changedKeys = this._changedKeys(data.attributes);
+      }
     }
 
-    assign(this._data, data.attributes);
+    if (this.hasRecord && this._record._assignAttributes) {
+      this._record._assignAttributes(data.attributes);
+    } else {
+      assign(this._data, data.attributes);
+    }
+
     this.pushedData();
 
     if (this.hasRecord) {
