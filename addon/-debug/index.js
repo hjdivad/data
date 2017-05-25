@@ -64,12 +64,12 @@ function checkPolymorphic(modelClass, addedModelClass) {
          should be added/set for the relationship
 */
 export function assertPolymorphicType(parentInternalModel, relationshipMeta, addedInternalModel) {
-  let addedModelName = addedInternalModel.modelName;
-  let parentModelName = parentInternalModel.modelName;
-  let key = relationshipMeta.key;
-  let relationshipModelName = relationshipMeta.type;
-  let relationshipClass = parentInternalModel.store.modelFor(relationshipModelName);
-  let assertionMessage = `You cannot add a record of modelClass '${addedModelName}' to the '${parentModelName}.${key}' relationship (only '${relationshipModelName}' allowed)`;
+  // let addedModelName = addedInternalModel.modelName;
+  // let parentModelName = parentInternalModel.modelName;
+  // let key = relationshipMeta.key;
+  // let relationshipModelName = relationshipMeta.type;
+  // let relationshipClass = parentInternalModel.store.modelFor(relationshipModelName);
+  // let assertionMessage = `You cannot add a record of modelClass '${addedModelName}' to the '${parentModelName}.${key}' relationship (only '${relationshipModelName}' allowed)`;
 
-  assert(assertionMessage, checkPolymorphic(relationshipClass, addedInternalModel.modelClass));
+  // assert(assertionMessage, checkPolymorphic(relationshipClass, addedInternalModel.modelClass));
 }
