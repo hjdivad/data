@@ -339,14 +339,16 @@ export default class InternalModel {
         assign(createOptions, properties);
       }
 
-      if (setOwner) {
-        // ensure that `getOwner(this)` works inside a model instance
-        setOwner(createOptions, getOwner(this.store));
-      } else {
+      if (!setOwner) {
         createOptions.container = this.store.container;
       }
 
       this._record = this.store.modelFactoryFor(this.modelName).create(createOptions);
+
+      if (setOwner) {
+        // ensure that `getOwner(this)` works inside a model instance
+        setOwner(this._record, getOwner(this.store));
+      }
 
       this._triggerDeferredTriggers();
       heimdall.stop(token);
