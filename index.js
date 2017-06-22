@@ -36,6 +36,10 @@ function isProductionEnv() {
 module.exports = {
   name: 'ember-data',
 
+  isDevelopingAddon() {
+    return true;
+  },
+
   _warn: function(message) {
     var chalk = require('chalk');
     var warning = chalk.yellow('WARNING: ' + message);
