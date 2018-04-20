@@ -115,12 +115,16 @@ export default function belongsTo(modelName, options) {
         });
       }
 
-      return this._internalModel._relationships.get(key).getRecord();
+      return this._internalModel.getBelongsTo(key);
     },
     set(key, value) {
+      //  left over from rebase; unsure if this does anything now
+      // if (value === undefined) {
+      //   value = null;
+      // }
       this._internalModel.setDirtyBelongsTo(key, value);
 
-      return this._internalModel._relationships.get(key).getRecord();
+      return this._internalModel.getBelongsTo(key);
     }
   }).meta(meta);
 }

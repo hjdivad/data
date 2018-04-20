@@ -16,12 +16,17 @@ function getDefaultValue(record, options, key) {
   }
 }
 
-function hasValue(record, key) {
-  return key in record._attributes ||
-         key in record._inFlightAttributes ||
-         key in record._data;
+function hasValue(internalModel, key) {
+  return internalModel._modelData.hasAttr(key);
 }
 
+<<<<<<< HEAD
+=======
+function getValue(internalModel, key) {
+  return internalModel._modelData.getAttr(key);
+}
+
+>>>>>>> rebase done up to unloading
 /**
   `DS.attr` defines an attribute on a [DS.Model](/api/data/classes/DS.Model.html).
   By default, attributes are passed through as-is, however you can specify an
@@ -131,7 +136,20 @@ export default function attr(type, options) {
       }
     },
     set(key, value) {
+<<<<<<< HEAD
       return this._internalModel.setDirtyAttribute(key, value);
+=======
+      let currentValue = this._internalModel._modelData.getAttr(key);
+      if (currentValue !== value) {
+        this._internalModel._modelData.setAttr(key, value);
+        let isDirty = this._internalModel._modelData.isAttrDirty(key);
+        this._internalModel.send('didSetProperty', {
+          name: key,
+          isDirty: isDirty
+        });
+      }
+      return value;
+>>>>>>> rebase done up to unloading
     }
   }).meta(meta);
 }

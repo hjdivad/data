@@ -35,7 +35,6 @@ module("integration/relationships/has_many - Has-Many Relationships", {
       messages: hasMany('message', { polymorphic: true, async: false }),
       contacts: hasMany('user', { inverse: null, async: false })
     });
-    User.reopenClass({ toString: () => 'User' });
 
     Contact = DS.Model.extend({
       user: belongsTo('user', { async: false })
@@ -2477,12 +2476,8 @@ test("Relationship.clear removes all records correctly", function(assert) {
     post = env.store.peekRecord('post', 2);
   });
 
-  run(() => {
-    // unclear what the semantics of clearing a yet to be created relationship
-    // ought to be.
-    env.store.peekAll('comment').mapBy('post');
-
-    post._internalModel._relationships.get('comments').clear();
+  run(function() {
+    post._internalModel._modelData._relationships.get('comments').clear();
     let comments = A(env.store.peekAll('comment'));
     assert.deepEqual(comments.mapBy('post'), [null, null, null]);
   });
@@ -2672,8 +2667,13 @@ test("hasMany hasAnyRelationshipData async loaded", function(assert) {
 
   return run(() => {
     return store.findRecord('chapter', 1).then(chapter => {
+<<<<<<< HEAD
       let relationship = chapter._internalModel._relationships.get('pages');
       assert.equal(relationship.hasAnyRelationshipData, true, 'relationship has data');
+=======
+      let relationship = chapter._internalModel._modelData._relationships.get('pages');
+      assert.equal(relationship.hasData, true, 'relationship has data');
+>>>>>>> rebase done up to unloading
     });
   });
 });
@@ -2698,8 +2698,13 @@ test("hasMany hasAnyRelationshipData sync loaded", function(assert) {
 
   return run(() => {
     return store.findRecord('chapter', 1).then(chapter => {
+<<<<<<< HEAD
       let relationship = chapter._internalModel._relationships.get('pages');
       assert.equal(relationship.hasAnyRelationshipData, true, 'relationship has data');
+=======
+      let relationship = chapter._internalModel._modelData._relationships.get('pages');
+      assert.equal(relationship.hasData, true, 'relationship has data');
+>>>>>>> rebase done up to unloading
     });
   });
 });
@@ -2728,8 +2733,13 @@ test("hasMany hasAnyRelationshipData async not loaded", function(assert) {
 
   return run(() => {
     return store.findRecord('chapter', 1).then(chapter => {
+<<<<<<< HEAD
       let relationship = chapter._internalModel._relationships.get('pages');
       assert.equal(relationship.hasAnyRelationshipData, false, 'relationship does not have data');
+=======
+      let relationship = chapter._internalModel._modelData._relationships.get('pages');
+      assert.equal(relationship.hasData, false, 'relationship does not have data');
+>>>>>>> rebase done up to unloading
     });
   });
 });
@@ -2749,8 +2759,13 @@ test("hasMany hasAnyRelationshipData sync not loaded", function(assert) {
 
   return run(() => {
     return store.findRecord('chapter', 1).then(chapter => {
+<<<<<<< HEAD
       let relationship = chapter._internalModel._relationships.get('pages');
       assert.equal(relationship.hasAnyRelationshipData, false, 'relationship does not have data');
+=======
+      let relationship = chapter._internalModel._modelData._relationships.get('pages');
+      assert.equal(relationship.hasData, false, 'relationship does not have data');
+>>>>>>> rebase done up to unloading
     });
   });
 });
@@ -2765,12 +2780,25 @@ test("hasMany hasAnyRelationshipData async created", function(assert) {
   let chapter = store.createRecord('chapter', { title: 'The Story Begins' });
   let page = store.createRecord('page');
 
+<<<<<<< HEAD
   let relationship = chapter._internalModel._relationships.get('pages');
   assert.equal(relationship.hasAnyRelationshipData, false, 'relationship does not have data');
 
   chapter = store.createRecord('chapter', {
     title: 'The Story Begins',
     pages: [page]
+=======
+    let relationship = chapter._internalModel._modelData._relationships.get('pages');
+    assert.equal(relationship.hasData, false, 'relationship does not have data');
+
+    chapter = store.createRecord('chapter', {
+      title: 'The Story Begins',
+      pages: [page]
+    });
+
+    relationship = chapter._internalModel._modelData._relationships.get('pages');
+    assert.equal(relationship.hasData, true, 'relationship has data');
+>>>>>>> rebase done up to unloading
   });
 
   relationship = chapter._internalModel._relationships.get('pages');
@@ -2780,14 +2808,30 @@ test("hasMany hasAnyRelationshipData async created", function(assert) {
 test("hasMany hasAnyRelationshipData sync created", function(assert) {
   assert.expect(2);
 
+<<<<<<< HEAD
   let chapter = store.createRecord('chapter', { title: 'The Story Begins' });
   let relationship = chapter._internalModel._relationships.get('pages');
+=======
+  run(() => {
+    let chapter = store.createRecord('chapter', { title: 'The Story Begins' });
+    let relationship = chapter._internalModel._modelData._relationships.get('pages');
+>>>>>>> rebase done up to unloading
 
   assert.equal(relationship.hasAnyRelationshipData, false, 'relationship does not have data');
 
+<<<<<<< HEAD
   chapter = store.createRecord('chapter', {
     title: 'The Story Begins',
     pages: [store.createRecord('page')]
+=======
+    chapter = store.createRecord('chapter', {
+      title: 'The Story Begins',
+      pages: [store.createRecord('page')]
+    });
+    relationship = chapter._internalModel._modelData._relationships.get('pages');
+
+    assert.equal(relationship.hasData, true, 'relationship has data');
+>>>>>>> rebase done up to unloading
   });
   relationship = chapter._internalModel._relationships.get('pages');
 
@@ -2804,7 +2848,7 @@ test("Model's hasMany relationship should not be created during model creation",
       }
     });
     user = env.store.peekRecord('user', 1);
-    assert.ok(!user._internalModel._relationships.has('messages'), 'Newly created record should not have relationships');
+    assert.ok(!user._internalModel._modelData._relationships.has('messages'), 'Newly created record should not have relationships');
   });
 });
 
@@ -2813,7 +2857,7 @@ test("Model's belongsTo relationship should be created during 'get' method", fun
   run(() => {
     user = env.store.createRecord('user');
     user.get('messages');
-    assert.ok(user._internalModel._relationships.has('messages'), "Newly created record with relationships in params passed in its constructor should have relationships");
+    assert.ok(user._internalModel._modelData._relationships.has('messages'), "Newly created record with relationships in params passed in its constructor should have relationships");
   });
 });
 
@@ -2848,7 +2892,7 @@ test("metadata is accessible when pushed as a meta property for a relationship",
   });
 
   run(() => {
-    assert.equal(book._internalModel._relationships.get('chapters').meta.where, 'the lefkada sea', 'meta is there');
+    assert.equal(book._internalModel._modelData._relationships.get('chapters').meta.where, 'the lefkada sea', 'meta is there');
   });
 });
 
@@ -3488,11 +3532,7 @@ test("deleted records should stay deleted", function(assert) {
       }]
     });
 
-    assert.deepEqual(
-      get(user, 'messages').mapBy('id'),
-      ['message-2', 'message-3'],
-      'user should have 2 message since 1 was deleted'
-    );
+    assert.equal(get(user, 'messages.length'), 2, 'user should have 2 message since 1 was deleted');
   });
 });
 

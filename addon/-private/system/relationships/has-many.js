@@ -1,6 +1,7 @@
 /**
   @module ember-data
 */
+
 import { computed } from '@ember/object';
 import { assert, inspect } from '@ember/debug';
 import normalizeModelName from "../normalize-model-name";
@@ -140,7 +141,7 @@ export default function hasMany(type, options) {
 
   return computed({
     get(key) {
-      return this._internalModel._relationships.get(key).getRecords();
+      return this._internalModel.getHasMany(key);
     },
     set(key, records) {
       this._internalModel.setDirtyHasMany(key, records);
